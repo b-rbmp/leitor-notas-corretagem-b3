@@ -117,21 +117,23 @@ def find_ticker_by_especificacao(especificacao: str):
     if ticker == "":
         raise Exception("Ticker não encontrado")
     
+    aditivo = None
     if re.search("ON", especificacao, re.IGNORECASE):
-        ticker = ticker + "3"
-    elif re.search("PN", especificacao, re.IGNORECASE):
-        ticker = ticker + "4"
+        aditivo = "3"
     elif re.search("PNA", especificacao, re.IGNORECASE):
-        ticker = ticker + "5"
+        aditivo = "5"
     elif re.search("PNB", especificacao, re.IGNORECASE):
-        ticker = ticker + "6"
+        aditivo = "6"
+    elif re.search("PN", especificacao, re.IGNORECASE):
+        aditivo = "4"
     elif re.search("UNT", especificacao, re.IGNORECASE):
-        ticker = ticker + "11"
+        aditivo = "11"
     elif re.search("CI", especificacao, re.IGNORECASE):
-        ticker = ticker + "11"
+        aditivo = "11"
     elif re.search("DO", especificacao, re.IGNORECASE):
-        ticker = ticker + "1"
-
+        aditivo = "1"
+    
+    ticker = ticker + aditivo
     return ticker.upper()
     
 # From a list of NotaCompilada, create a dataframe with all operations and return it
@@ -331,7 +333,7 @@ def tratamento_texto_nao_processados():
                         else:
                             raise Exception('Não foi possível identificar o ticker da opção')
 
-                        daytrade = True if re.search(r'OPCAO.* D .*-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*', linha, re.IGNORECASE) else False
+                        daytrade = True if re.search(r'OPCAO.* [2#8FTI]*D[2#8FTI]* .*-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*', linha, re.IGNORECASE) else False
 
                         # Grupo de quantidades no fim da linha
                         grupo_quantidades = re.search(r'(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) [CD]', linha, re.IGNORECASE)
@@ -364,7 +366,7 @@ def tratamento_texto_nao_processados():
                             raise Exception('Não foi possível identificar se é compra ou venda')
 
                         # Daytrade
-                        daytrade = True if re.search(r'VISTA.* D .*-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*', linha, re.IGNORECASE) else False
+                        daytrade = True if re.search(r'VISTA.* [2#8FTI]*D[2#8FTI]* .*-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*', linha, re.IGNORECASE) else False
 
 
                         # Ticker do A vista
