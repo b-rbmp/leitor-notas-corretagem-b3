@@ -20,6 +20,7 @@ especificacoes = {
     'BRASKEM': 'brkm',
     'BRADESCO': 'bbdc',
     'BANCO DO BRASIL': 'bbas',
+    'BRASIL ON NM': 'bbas',
     'ITAU UNIBANCO': 'itub',
     'VALE': 'vale',
     'PETROBRAS': 'petr',
@@ -45,8 +46,12 @@ especificacoes = {
     'LOG COM': 'logg',
     'AERIS': 'aerI',
     'ALUPAR': 'alup',
-
-
+    'ITIP': 'itip',
+    'IFID': 'ifid',
+    'SLC AGRICOLA': 'slce',
+    'B5P2': 'b5p2',
+    'LOJAS RENNER': 'lren',
+    'MRV': 'mrve',
 
 
     

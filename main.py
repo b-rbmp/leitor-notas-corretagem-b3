@@ -98,6 +98,8 @@ def extract_invoices_from_pdf(pdf_path: str) -> List[NotaCorretagemTratamento]:
 def find_corretora(texto: str):
     if re.search('Rico Investimentos', texto):
         return "RICO"
+    elif re.search('CLEAR', texto):
+        return "CLEAR"
     else:
         raise Exception("Corretora não encontrada")
 
@@ -130,8 +132,14 @@ def find_ticker_by_especificacao(especificacao: str):
         aditivo = "11"
     elif re.search("CI", especificacao, re.IGNORECASE):
         aditivo = "11"
+    elif re.search("FII ", especificacao, re.IGNORECASE):
+        aditivo = "11"
+    elif re.search("F11", especificacao, re.IGNORECASE):
+        aditivo = "11"
     elif re.search("DO", especificacao, re.IGNORECASE):
         aditivo = "1"
+    else:
+        raise Exception("Aditivo não encontrado")
     
     ticker = ticker + aditivo
     return ticker.upper()
@@ -185,7 +193,10 @@ def tratamento_texto_nao_processados():
         if numero_nota is not None:
             numero_nota = numero_nota.group(1)
         else:
-            raise Exception("Número da nota não encontrado")
+            for i in range(1, 100):
+                if get_nota_number_inside_nota_list(str(i), notas_compiladas) is None:
+                    numero_nota = str(i)
+                    break
 
         nota_exists_index = get_nota_number_inside_nota_list(numero_nota, notas_compiladas)
         if nota_exists_index is not None:
@@ -224,6 +235,9 @@ def tratamento_texto_nao_processados():
             corretora = find_corretora(nota_corretagem.texto)
             data_nota = ""
             data_nota_find = re.search('([0-9]{2}/[0-9]{2}/[0-9]{4})\n\nRico', nota_corretagem.texto)
+            if data_nota_find is None:
+                data_nota_find = re.search('([0-9]{2}/[0-9]{2}/[0-9]{4})\n\nCLEAR', nota_corretagem.texto)
+
             if data_nota_find is None:
                 data_nota_find = re.search('Data pregão\n([0-9]{2}/[0-9]{2}/[0-9]{4})\n\n', nota_corretagem.texto)
             if data_nota_find is not None:
@@ -313,6 +327,8 @@ def tratamento_texto_nao_processados():
         else:
             nota_corretagem.texto = nota_corretagem.texto.replace("FRACIONARIO", "VISTA")
             linhas = re.findall(r'1-BOVESPA(.*)\n', nota_corretagem.texto)
+            if not linhas:
+                linhas = re.findall(r'7-BOVESPA FIX(.*)\n', nota_corretagem.texto)
             if linhas:
                 is_opcao = True if re.search(r'OPCAO', linhas[0], re.IGNORECASE) else False
                 is_vista = True if re.search(r'VISTA', linhas[0], re.IGNORECASE) else False
@@ -327,7 +343,7 @@ def tratamento_texto_nao_processados():
                             raise Exception('Não foi possível identificar se é compra ou venda')
 
                         # Ticker da Opção
-                        ticker = re.search(r'\d{2}/\d{2} .*([A-Z]{5}[0-9]{1,3})\s', linha, re.IGNORECASE)
+                        ticker = re.search(r'\d{2}/\d{2}.* (\w{5}[0-9]{1,3})\s', linha, re.IGNORECASE)
                         if ticker is not None:
                             ticker = ticker.group(1)
                         else:
@@ -370,7 +386,7 @@ def tratamento_texto_nao_processados():
 
 
                         # Ticker do A vista
-                        especificacao = re.search(r'VISTA\s(\D*)\d', linha, re.IGNORECASE)
+                        especificacao = re.search(r'VISTA\s(.*\D+\d?)\s\d', linha, re.IGNORECASE)
                         ticker = ""
                         if especificacao is not None:
                             especificacao = especificacao.group(1)
