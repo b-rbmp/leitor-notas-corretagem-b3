@@ -22,6 +22,7 @@ especificacoes = {
     'BANCO DO BRASIL': 'bbas',
     'BRASIL ON NM': 'bbas',
     'ITAU UNIBANCO': 'itub',
+    'ITAUUNIBANCO': 'itub',
     'VALE': 'vale',
     'PETROBRAS': 'petr',
     'AMBEV': 'abev',
@@ -52,7 +53,8 @@ especificacoes = {
     'B5P2': 'b5p2',
     'LOJAS RENNER': 'lren',
     'MRV': 'mrve',
-
+    'KLABIN': 'klbn',
+    'JBS': 'jbss',
 
     
 }
