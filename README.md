@@ -8,7 +8,7 @@
 ## About <a name = "about"></a>
 Simple brokerage note reader for B3 (Brazilian Stock Exchange), for the broker Rico Investimentos.
 
-Separates day trades from regular trades, and calculates the total amount fees paid for each operation.
+Separates day trades from regular trades, and calculates the total amount of fees paid for each operation.
 
 Generates a csv file with key columns for further analysis and usage.
 
@@ -36,4 +36,4 @@ Run the main.py file create key folders in the root directory. It will create th
 
 Upload the brokerage notes to the **notas/nao_processados** folder. Run the script and the csv file will be generated in the **output** folder. Processed brokerage notes will be moved to the **notas/processados** folder.
 
-Every time the script is run, it will read the brokerage notes in the **notas/nao_processados** folder, process them and move them to the **notas/processados** folder. CSV file will be re-generated with the new data, in overwrite mode.
+Every time the script is run, it will read the brokerage notes in the **notas/nao_processados** folder, process them and move them to the **notas/processados** folder. The CSV  output file will be re-generated with the new data, in overwrite mode.
