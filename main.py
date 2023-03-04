@@ -18,9 +18,9 @@ from pydantic import BaseModel
 
 from especificacoes import especificacoes
 
-
-PASTA_NAO_PROCESSADOS = "notas/nao_processados/"
-PASTA_PROCESSADOS = "notas/processados/"
+PASTA_NOTAS = "notas/"
+PASTA_NAO_PROCESSADOS = PASTA_NOTAS+"nao_processados/"
+PASTA_PROCESSADOS = PASTA_NOTAS+"processados/"
 
 class NotaCorretagemTratamento(BaseModel):
     texto: str
@@ -50,6 +50,18 @@ class NotaCompilada(BaseModel):
     taxas: float | None = None
     liquido: float | None = None
     operacoes_compiladas: List[Operacao] = []
+
+# Create a folder "notas" if it doesn't exist, with subfolders "processados" and "nao_processados". Create a folder "output" if it doesn't exist
+def setup_folders():
+    if not os.path.exists(PASTA_NOTAS):
+        os.mkdir(PASTA_NOTAS)
+    if not os.path.exists(PASTA_NAO_PROCESSADOS):
+        os.mkdir(PASTA_NAO_PROCESSADOS)
+    if not os.path.exists(PASTA_PROCESSADOS):
+        os.mkdir(PASTA_PROCESSADOS)
+    if not os.path.exists("output"):
+        os.mkdir("output")
+
 
 # Open the file and extract invoices from all pages, in string format
 def extract_invoices_from_pdf(pdf_path: str) -> List[NotaCorretagemTratamento]:
@@ -461,4 +473,5 @@ def tratamento_texto_nao_processados():
         shutil.move(os.path.join(PASTA_NAO_PROCESSADOS, file), PASTA_PROCESSADOS)
 
 if __name__ == "__main__":
+    setup_folders()
     tratamento_texto_nao_processados()
