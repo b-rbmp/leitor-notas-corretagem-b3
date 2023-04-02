@@ -88,6 +88,7 @@ def extract_invoices_from_pdf(pdf_path: str) -> List[NotaCorretagemTratamento]:
 
                 text = output_string.getvalue()
 
+                text = text.replace(u'\xa0', u' ')
                 pagina_inicial = re.search('NOTA DE NEGOCIAÇÃO', text)
                 is_pagina_inicial = True if pagina_inicial is not None else False
 
@@ -108,8 +109,10 @@ def extract_invoices_from_pdf(pdf_path: str) -> List[NotaCorretagemTratamento]:
 
 # Encontra a corretora da nota de corretagem
 def find_corretora(texto: str):
-    if re.search('Rico Investimentos', texto):
+    if re.search('Rico Investimentos', texto, re.IGNORECASE):
         return "RICO"
+    elif re.search('Inter DTVM', texto, re.IGNORECASE):
+        return "INTER"
     elif re.search('CLEAR', texto):
         return "CLEAR"
     else:
@@ -127,6 +130,12 @@ def find_ticker_by_especificacao(especificacao: str):
         if re.search(especificacao_key, especificacao, re.IGNORECASE):
             ticker = especificacao_value
             break
+
+    if ticker == "":
+        for especificacao_key, especificacao_value in especificacoes.items():
+            if re.search(especificacao_value, especificacao, re.IGNORECASE):
+                ticker = especificacao_value
+                break
 
     if ticker == "":
         raise Exception("Ticker não encontrado")
@@ -199,6 +208,7 @@ def tratamento_texto_nao_processados():
         
         is_nota_bmef = True if re.search('BM&F', nota_corretagem.texto) else False
         
+
         numero_nota = re.search('Nr. nota\n\nFolha\n\nData pregão\n\n(\d+)\n\n', nota_corretagem.texto)
         if numero_nota is None:
             numero_nota = re.search('Nr. nota\n\n([\d\.]+)\n\n', nota_corretagem.texto)
@@ -215,13 +225,77 @@ def tratamento_texto_nao_processados():
             corretora = notas_compiladas[nota_exists_index].corretora
             data_nota = notas_compiladas[nota_exists_index].data
 
-            if notas_compiladas[nota_exists_index].irpf is None:
+            if corretora == "RICO" or corretora == "CLEAR":
+                if notas_compiladas[nota_exists_index].irpf is None:
+                    irpf_nota = re.search('\n(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*)I.R.R.F.', nota_corretagem.texto)
+                    if irpf_nota is None:
+                        irpf_nota = re.search('IRRF operacional .*\n\n(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) ', nota_corretagem.texto)
+                    if irpf_nota is not None:
+                        notas_compiladas[nota_exists_index].irpf = float(irpf_nota.group(1).replace('.', '').replace(',', '.'))
+                if notas_compiladas[nota_exists_index].liquido is None:
+                    liquido_nota = re.search('[DC]\n(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*).*Líquido para .+([DC])', nota_corretagem.texto)
+                    if liquido_nota is not None:
+                        liquido_nota_valor = liquido_nota.group(1)
+                        liquido_nota_valor = liquido_nota_valor.replace(".", "")
+                        liquido_nota_valor = liquido_nota_valor.replace(",", ".")
+                        liquido = float(liquido_nota_valor)
+                        if liquido_nota.group(4) == "D":
+                            liquido = liquido * -1
+                        notas_compiladas[nota_exists_index].liquido = liquido
+                    if liquido_nota is None:
+                        liquido_nota = re.search(' ([0-9]+(\.[0-9]{3})*(,[0-9]+)?) \| ([DC]) \n\n\+Custos BM&F', nota_corretagem.texto)
+                        if liquido_nota is not None:
+                            liquido_nota_valor = liquido_nota.group(1)
+                            liquido_nota_valor = liquido_nota_valor.replace(".", "")
+                            liquido_nota_valor = liquido_nota_valor.replace(",", ".")
+                            liquido = float(liquido_nota_valor)
+                            if liquido_nota.group(4) == "D":
+                                liquido = liquido * -1
+                            notas_compiladas[nota_exists_index].liquido = liquido
+            elif corretora == "INTER":
+                if notas_compiladas[nota_exists_index].irpf is None:
+                    irpf_nota = re.search('\n(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*)I.R.R.F.', nota_corretagem.texto)
+                    if irpf_nota is None:
+                        irpf_nota = re.search('IRRF operacional .*\n\n(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) ', nota_corretagem.texto)
+                    if irpf_nota is not None:
+                        notas_compiladas[nota_exists_index].irpf = float(irpf_nota.group(1).replace('.', '').replace(',', '.'))
+                if notas_compiladas[nota_exists_index].liquido is None:
+                    liquido_nota = re.search('\nLiquido .*para .*([0-9]{2}/[0-9]{2}/[0-9]{4}) (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) .*[DC]\n', nota_corretagem.texto)
+                    if liquido_nota is None:
+                        liquido_nota = re.search('\nLíquido .*para .*([0-9]{2}/[0-9]{2}/[0-9]{4}) (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) .*[DC]\n', nota_corretagem.texto)
+
+                    if liquido_nota is not None:
+                        liquido_nota_valor = liquido_nota.group(2)
+                        liquido_nota_valor = liquido_nota_valor.replace(".", "")
+                        liquido_nota_valor = liquido_nota_valor.replace(",", ".")
+                        liquido = float(liquido_nota_valor)
+                        notas_compiladas[nota_exists_index].liquido = liquido
+            
+
+
+        else: 
+            corretora = find_corretora(nota_corretagem.texto)
+            if corretora == "RICO" or corretora == "CLEAR":
+                data_nota = ""
+                data_nota_find = re.search('([0-9]{2}/[0-9]{2}/[0-9]{4})\n\nRico', nota_corretagem.texto)
+                if data_nota_find is None:
+                    data_nota_find = re.search('([0-9]{2}/[0-9]{2}/[0-9]{4})\n\nCLEAR', nota_corretagem.texto)
+                if data_nota_find is None:
+                    data_nota_find = re.search('Data pregão\n([0-9]{2}/[0-9]{2}/[0-9]{4})\n\n', nota_corretagem.texto)
+                if data_nota_find is not None:
+                    data_nota = data_nota_find.group(1)
+                else:
+                    raise Exception("Data da nota não encontrada")
+
+                nota_compilada = NotaCompilada(nr_nota=numero_nota, corretora=corretora, data=data_nota)
+
+
                 irpf_nota = re.search('\n(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*)I.R.R.F.', nota_corretagem.texto)
                 if irpf_nota is None:
                     irpf_nota = re.search('IRRF operacional .*\n\n(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) ', nota_corretagem.texto)
                 if irpf_nota is not None:
-                    notas_compiladas[nota_exists_index].irpf = float(irpf_nota.group(1).replace('.', '').replace(',', '.'))
-            if notas_compiladas[nota_exists_index].liquido is None:
+                    nota_compilada.irpf = float(irpf_nota.group(1).replace('.', '').replace(',', '.'))
+
                 liquido_nota = re.search('[DC]\n(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*).*Líquido para .+([DC])', nota_corretagem.texto)
                 if liquido_nota is not None:
                     liquido_nota_valor = liquido_nota.group(1)
@@ -230,7 +304,7 @@ def tratamento_texto_nao_processados():
                     liquido = float(liquido_nota_valor)
                     if liquido_nota.group(4) == "D":
                         liquido = liquido * -1
-                    notas_compiladas[nota_exists_index].liquido = liquido
+                    nota_compilada.liquido = liquido
                 if liquido_nota is None:
                     liquido_nota = re.search(' ([0-9]+(\.[0-9]{3})*(,[0-9]+)?) \| ([DC]) \n\n\+Custos BM&F', nota_corretagem.texto)
                     if liquido_nota is not None:
@@ -240,51 +314,40 @@ def tratamento_texto_nao_processados():
                         liquido = float(liquido_nota_valor)
                         if liquido_nota.group(4) == "D":
                             liquido = liquido * -1
-                        notas_compiladas[nota_exists_index].liquido = liquido
+                        nota_compilada.liquido = liquido
+            elif corretora == "INTER":
+                data_nota = ""
+                data_nota_find = re.search('Data pregão: ([0-9]{2}/[0-9]{2}/[0-9]{4})', nota_corretagem.texto)
+                if data_nota_find is None and corretora == "INTER":
+                    data_nota_find = re.search('Data pregão:\xa0([0-9]{2}/[0-9]{2}/[0-9]{4})', nota_corretagem.texto)
+                if data_nota_find is None and corretora == "INTER":
+                    data_nota_find = re.search('\n\n([0-9]{2}/[0-9]{2}/[0-9]{4})\n\nINTER DTVM', nota_corretagem.texto)
+                if data_nota_find is None:
+                    data_nota_find = re.search('Data pregão\n([0-9]{2}/[0-9]{2}/[0-9]{4})\n\n', nota_corretagem.texto)
+                if data_nota_find is not None:
+                    data_nota = data_nota_find.group(1)
+                else:
+                    raise Exception("Data da nota não encontrada")
+
+                nota_compilada = NotaCompilada(nr_nota=numero_nota, corretora=corretora, data=data_nota)
 
 
-        else: 
-            corretora = find_corretora(nota_corretagem.texto)
-            data_nota = ""
-            data_nota_find = re.search('([0-9]{2}/[0-9]{2}/[0-9]{4})\n\nRico', nota_corretagem.texto)
-            if data_nota_find is None:
-                data_nota_find = re.search('([0-9]{2}/[0-9]{2}/[0-9]{4})\n\nCLEAR', nota_corretagem.texto)
+                irpf_nota = re.search('I.R.R.F. s/ operações, .*base (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) ', nota_corretagem.texto)
+                if irpf_nota is not None:
+                    nota_compilada.irpf = float(irpf_nota.group(4).replace('.', '').replace(',', '.'))
 
-            if data_nota_find is None:
-                data_nota_find = re.search('Data pregão\n([0-9]{2}/[0-9]{2}/[0-9]{4})\n\n', nota_corretagem.texto)
-            if data_nota_find is not None:
-                data_nota = data_nota_find.group(1)
-            else:
-                raise Exception("Data da nota não encontrada")
+                liquido_nota = re.search('\nLiquido .*para .*([0-9]{2}/[0-9]{2}/[0-9]{4}) (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) .*[DC]\n', nota_corretagem.texto)
+                if liquido_nota is None:
+                    liquido_nota = re.search('\nLíquido .*para .*([0-9]{2}/[0-9]{2}/[0-9]{4}) (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) .*[DC]\n', nota_corretagem.texto)
 
-            nota_compilada = NotaCompilada(nr_nota=numero_nota, corretora=corretora, data=data_nota)
-
-
-            irpf_nota = re.search('\n(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*)I.R.R.F.', nota_corretagem.texto)
-            if irpf_nota is None:
-                irpf_nota = re.search('IRRF operacional .*\n\n(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) ', nota_corretagem.texto)
-            if irpf_nota is not None:
-                nota_compilada.irpf = float(irpf_nota.group(1).replace('.', '').replace(',', '.'))
-
-            liquido_nota = re.search('[DC]\n(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*).*Líquido para .+([DC])', nota_corretagem.texto)
-            if liquido_nota is not None:
-                liquido_nota_valor = liquido_nota.group(1)
-                liquido_nota_valor = liquido_nota_valor.replace(".", "")
-                liquido_nota_valor = liquido_nota_valor.replace(",", ".")
-                liquido = float(liquido_nota_valor)
-                if liquido_nota.group(4) == "D":
-                    liquido = liquido * -1
-                nota_compilada.liquido = liquido
-            if liquido_nota is None:
-                liquido_nota = re.search(' ([0-9]+(\.[0-9]{3})*(,[0-9]+)?) \| ([DC]) \n\n\+Custos BM&F', nota_corretagem.texto)
                 if liquido_nota is not None:
-                    liquido_nota_valor = liquido_nota.group(1)
+                    liquido_nota_valor = liquido_nota.group(2)
                     liquido_nota_valor = liquido_nota_valor.replace(".", "")
                     liquido_nota_valor = liquido_nota_valor.replace(",", ".")
                     liquido = float(liquido_nota_valor)
-                    if liquido_nota.group(4) == "D":
-                        liquido = liquido * -1
                     nota_compilada.liquido = liquido
+                
+                
 
 
 
@@ -337,10 +400,17 @@ def tratamento_texto_nao_processados():
 
 
         else:
-            nota_corretagem.texto = nota_corretagem.texto.replace("FRACIONARIO", "VISTA")
-            linhas = re.findall(r'1-BOVESPA(.*)\n', nota_corretagem.texto)
+            nota_corretagem.texto = nota_corretagem.texto.replace("FRACIONARIO ", "VISTA ")
+            nota_corretagem.texto = nota_corretagem.texto.replace("FRAC ", "VISTA " )
+
+            nota_corretagem.texto = nota_corretagem.texto.replace("VIS ", "VISTA ") # INTER
+            nota_corretagem.texto = nota_corretagem.texto.replace("VISV ", "VISTA V") # INTER
+            nota_corretagem.texto = nota_corretagem.texto.replace("OPC ", "OPCAO ") # INTER
+            linhas = re.findall(r'1-BOVESPA(.*)\n', nota_corretagem.texto, re.IGNORECASE)
             if not linhas:
-                linhas = re.findall(r'7-BOVESPA FIX(.*)\n', nota_corretagem.texto)
+                linhas = re.findall(r'7-BOVESPA FIX(.*)\n', nota_corretagem.texto, re.IGNORECASE)
+            if not linhas:
+                linhas = re.findall(r'BOVESPA(.*)\n', nota_corretagem.texto, re.IGNORECASE)
             if linhas:
                 is_opcao = True if re.search(r'OPCAO', linhas[0], re.IGNORECASE) else False
                 is_vista = True if re.search(r'VISTA', linhas[0], re.IGNORECASE) else False
@@ -388,9 +458,23 @@ def tratamento_texto_nao_processados():
                     for linha in linhas:
                         # Operacao
                         op = re.search(r'([VC]) VISTA', linha, re.IGNORECASE)
+                        if op is None:
+                            op = re.search(r'([VC])  VISTA', linha, re.IGNORECASE)
                         if op is not None:
                             op = op.group(1)
-                        else:
+
+                        if op is None and corretora == "INTER":
+                            grupo_quantidades = re.search(r'(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) ([CD])', linha, re.IGNORECASE)
+                            if grupo_quantidades is not None and len(grupo_quantidades.groups()) == 10:
+                                op = grupo_quantidades.group(10)
+
+                            if op is not None:
+                                if op == "C":
+                                    op = "V"
+                                elif op == "D":
+                                    op = "C"
+
+                        if op is None:
                             raise Exception('Não foi possível identificar se é compra ou venda')
 
                         # Daytrade
@@ -399,6 +483,8 @@ def tratamento_texto_nao_processados():
 
                         # Ticker do A vista
                         especificacao = re.search(r'VISTA\s(.*\D+\d?)\s\d', linha, re.IGNORECASE)
+                        if especificacao is None:
+                            especificacao = re.search(r'VISTA\s(.*\D+\d?)', linha, re.IGNORECASE)
                         ticker = ""
                         if especificacao is not None:
                             especificacao = especificacao.group(1)
@@ -410,12 +496,25 @@ def tratamento_texto_nao_processados():
                             raise Exception('Não foi possível identificar a especificação do A vista')
 
                         # Grupo de quantidades no fim da linha
+
+                        # Rico e Clear
                         grupo_quantidades = re.search(r'(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) [CD]', linha, re.IGNORECASE)
-                        if len(grupo_quantidades.groups()) == 9:
+                        if grupo_quantidades is not None and len(grupo_quantidades.groups()) == 9: 
                             quantidade = float(grupo_quantidades.group(1).replace('.', '').replace(',', '.'))
                             preco = float(grupo_quantidades.group(4).replace('.', '').replace(',', '.'))
                             valor = float(grupo_quantidades.group(7).replace('.', '').replace(',', '.'))
 
+                        # Inter
+                        grupo_quantidades = re.search(r'(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*)  (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*)  (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*)  [CD]', linha, re.IGNORECASE)
+                        if grupo_quantidades is None:
+                            grupo_quantidades = re.search(r'(-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) (-*[0-9]+(\.[0-9]{3})*(,[0-9]+)?-*) [CD]', linha, re.IGNORECASE)
+
+                        if grupo_quantidades is not None and len(grupo_quantidades.groups()) == 9: 
+                            quantidade = float(grupo_quantidades.group(1).replace('.', '').replace(',', '.'))
+                            preco = float(grupo_quantidades.group(4).replace('.', '').replace(',', '.'))
+                            valor = float(grupo_quantidades.group(7).replace('.', '').replace(',', '.'))
+
+                        if grupo_quantidades is not None:
                             notas_compiladas[tamanho_notas_compiladas-1].volume = notas_compiladas[tamanho_notas_compiladas-1].volume + abs(valor)
                             if op == 'C':
                                 notas_compiladas[tamanho_notas_compiladas-1].compras = notas_compiladas[tamanho_notas_compiladas-1].compras + abs(valor)
@@ -424,9 +523,9 @@ def tratamento_texto_nao_processados():
 
                             operacao = Operacao(data=data_nota, corretora=corretora, ativo=ticker, tipoOp=op, quantidade=quantidade, preco=preco, valor=valor, mercado=mercado, irpf=0.00, taxas=0.00, daytrade=daytrade)
                             notas_compiladas[tamanho_notas_compiladas-1].operacoes_compiladas.append(operacao)
-                            
+                        
                         else:
-                            raise Exception('Não foi possível identificar as quantidades da opção')
+                            raise Exception('Não foi possível identificar as quantidades da operacao')
 
                 else:
                     raise Exception(f'Não foi possível identificar o tipo de operação: {linhas[0]}')
